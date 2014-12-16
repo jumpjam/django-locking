@@ -23,30 +23,29 @@ class LockableAdmin(admin.ModelAdmin):
         css = {"all": (_s.STATIC_URL + 'locking/css/locking.css',)}
 
     def get_form(self, request, obj=None, *args, **kwargs):
-        form = super(LockableAdmin, self).get_form(request, obj, *args, 
-                                                   **kwargs)
+        form = super(LockableAdmin, self).get_form(request, *args, **kwargs)
         form.request = request
         form.obj = obj
         return form
 
     def changelist_view(self, request, extra_context=None):
-        # we need the request objects in a few places where it's usually not present, 
+        # we need the request objects in a few places where it's usually not present,
         # so we're tacking it on to the LockableAdmin class
         self.request = request
         return super(LockableAdmin, self).changelist_view(request,
                                                           extra_context)
 
     def save_model(self, request, obj, form, change, *args, **kwargs):
-        
+
         super(LockableAdmin, self).save_model(request, obj, form, change,
                                               *args, **kwargs)
-        
+
         try:
             # object creation doesn't need/have locking in place
             content_type = ContentType.objects.get_for_model(obj)
-            obj = Lock.objects.get(entry_id=obj.id,
+            obj = Lock.objects.filter(entry_id=obj.id,
                                    app=content_type.app_label,
-                                   model=content_type.model)
+                                   model=content_type.model)[0]
             obj.unlock_for(request.user)
             obj.save()
         except:
@@ -54,7 +53,7 @@ class LockableAdmin(admin.ModelAdmin):
 
 
     def get_lock_for_admin(self_obj, obj):
-        ''' 
+        '''
         returns the locking status along with a nice icon for the admin
         interface use in admin list display like so:
         list_display = ['title', 'get_lock_for_admin']
@@ -66,21 +65,21 @@ class LockableAdmin(admin.ModelAdmin):
 
         content_type = ContentType.objects.get_for_model(obj)
         try:
-            lock = Lock.objects.get(entry_id=obj.id,
+            lock = Lock.objects.filter(entry_id=obj.id,
                                     app=content_type.app_label,
-                                    model=content_type.model)
+                                    model=content_type.model)[0]
             class_name = 'locked'
             locked_by = lock.locked_by.username
             output = str(obj.id)
-        except Lock.DoesNotExist:
+        except:
             return ''
 
         if lock.is_locked:
             seconds_remaining = lock.lock_seconds_remaining
-            minutes_remaining = seconds_remaining/60
+            minutes_remaining = seconds_remaining / 60
             locked_until = _("Still locked for %s more minute(s) by %s.") \
                 % (minutes_remaining, lock.locked_by)
-            if self_obj.request.user == lock.locked_by: 
+            if self_obj.request.user == lock.locked_by:
                 locked_until_self = _(
                     "You have a lock on this content for %s more minute(s)."
                     ) % (minutes_remaining)
@@ -95,7 +94,7 @@ class LockableAdmin(admin.ModelAdmin):
                     <img src="%slocking/img/lock.png" title="%s" />'''\
                     % (_s.STATIC_URL, locked_until)
             full_name = "%s %s" % (
-                lock.locked_by.first_name,lock.locked_by.last_name)
+                lock.locked_by.first_name, lock.locked_by.last_name)
             return u'''
                 <a href="#" id=%s class="lock-status %s"
                    title="Locked By: %s">%s%s</a>''' % (output, class_name,
