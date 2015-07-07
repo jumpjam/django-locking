@@ -1,7 +1,7 @@
 from django.db import models
 from locking import models as locking
 
-class Story(locking.LockableModel):
+class Story(locking.Lock):
     content = models.TextField(blank=True)
     
     class Meta:
